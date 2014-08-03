@@ -22,7 +22,7 @@ void sendPacket(unsigned char bufferSize);
 
 SoftwareSerial mySerial(0, 1);
 
-unsigned int modbus_update(unsigned int *holdingRegs)
+bool process_serial_data()
 {
   unsigned char buffer = 0;
   unsigned char overflow = 0;
@@ -48,8 +48,19 @@ unsigned int modbus_update(unsigned int *holdingRegs)
   // variable and return to the main sketch without 
   // responding to the request i.e. force a timeout
   if (overflow)
+    return -1;
+  else
+    return buffer;
+}
+
+unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
+{
+  unsigned char buffer = 0;
+
+  buffer = process_serial_data();
+  if (buffer == -1)
     return errorCount++;
-  
+	
   // The minimum request packet is 8 bytes for function 3 & 16
   if (buffer > 6) 
   {

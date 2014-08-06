@@ -18,6 +18,7 @@ const char WRITE_MULTIPLE_REGISTERS = 16;
 // The maximum serial ring buffer size is 128
 unsigned char frame[BUFFER_SIZE];
 unsigned int holdingRegsSize; // size of the register array 
+unsigned int coilsSize; // size of the register array 
 unsigned char broadcastFlag;
 unsigned char slaveID;
 unsigned char function_code;
@@ -134,6 +135,23 @@ bool destined_for_me()
   else
   {
     return false;
+  }
+}
+
+void read_coils(bool *coils)
+{
+  // combine the starting address bytes
+  unsigned int startingAddress = ((frame[2] << 8) | frame[3]);
+  if (startingAddress < coilsSize) // check exception 2 ILLEGAL DATA ADDRESS
+  {
+    exceptionResponse(2); // exception 2 ILLEGAL DATA ADDRESS
+  }
+  // combine the number of register bytes  
+  unsigned int no_of_coils = ((frame[4] << 8) | frame[5]);
+  unsigned int maxData = startingAddress + no_of_coils;
+  if (maxData <= coilsSize || maxData > 2000) // check exception 3 ILLEGAL DATA VALUE
+  {
+    exceptionResponse(3); // exception 3 ILLEGAL DATA VALUE
   }
 }
 
@@ -279,7 +297,11 @@ unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
   }
 
       
-  if (function_code == 3)
+  if (function_code == 1)
+  {
+    read_coils(coils);
+  }
+  else if (function_code == 3)
   {
     read_holding_registers(holdingRegs);
   }
@@ -308,7 +330,9 @@ void exceptionResponse(unsigned char exception)
   }
 }
 
-void modbus_configure(long baud, unsigned char _slaveID, unsigned char _TxEnablePin, unsigned int _holdingRegsSize)
+void modbus_configure(
+  long baud, unsigned char _slaveID, unsigned char _TxEnablePin, 
+  unsigned int _holdingRegsSize, unsigned int _coilsSize)
 {
   slaveID = _slaveID;
   mySerial.begin(baud);
@@ -341,6 +365,7 @@ void modbus_configure(long baud, unsigned char _slaveID, unsigned char _TxEnable
   }
   
   holdingRegsSize = _holdingRegsSize;
+  coilsSize = _coilsSize;
   errorCount = 0; // initialize errorCount
 }   
 

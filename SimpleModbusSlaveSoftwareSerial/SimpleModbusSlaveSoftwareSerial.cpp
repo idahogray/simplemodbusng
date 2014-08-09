@@ -32,7 +32,7 @@ void exceptionResponse(unsigned char exception);
 unsigned int calculateCRC(unsigned char bufferSize); 
 void sendPacket(unsigned char bufferSize);
 
-SoftwareSerial mySerial(0, 1);
+SoftwareSerial mySerial(10, 11);
 
 bool process_serial_data()
 {
@@ -41,6 +41,7 @@ bool process_serial_data()
   
   while (mySerial.available())
   {
+    Serial.print("Reading Data from serial port: 0x");
     // The maximum number of bytes is limited to the serial buffer size of 128 bytes
     // If more bytes is received than the BUFFER_SIZE the overflow flag will be set and the 
     // serial buffer will be red untill all the data is cleared from the receive buffer.
@@ -51,6 +52,7 @@ bool process_serial_data()
       if (buffer_position == BUFFER_SIZE)
         overflow = 1;
       frame[buffer_position] = mySerial.read();
+      Serial.println(frame[buffer_position], HEX);
       buffer_position++;
     }
     delayMicroseconds(T1_5); // inter character time out
@@ -101,15 +103,23 @@ bool verify_frame_size(unsigned char buffer_size)
   }
 }
 
+unsigned char get_slave_id()
+{
+  return frame[SLAVE_ID_POSITION];
+}
+
 bool verify_slave_id_matches()
 {
-  unsigned char id = frame[SLAVE_ID_POSITION];
-  return id == slaveID;
+  return get_slave_id() == slaveID;
 }
 
 bool is_broadcast_message()
 {
-  return slaveID == BROADCAST_ADDRESS;
+  Serial.print("Slave ID: 0x");
+  Serial.println(get_slave_id(), HEX);
+  Serial.print("Broadcast Address: 0x");
+  Serial.println(BROADCAST_ADDRESS, HEX);
+  return get_slave_id() == BROADCAST_ADDRESS;
 }
 
 bool verify_broadcast_and_function_code()
@@ -128,6 +138,10 @@ bool verify_broadcast_and_function_code()
 
 bool destined_for_me()
 {
+  Serial.print("Verify Slave ID Matches: 0x");
+  Serial.println(verify_slave_id_matches(), HEX);
+  Serial.print("Broadcast Flag: 0x");
+  Serial.println(broadcastFlag, HEX);
   if (verify_slave_id_matches() || broadcastFlag)
   {
     return true;
@@ -142,7 +156,7 @@ void read_coils(bool *coils)
 {
   // combine the starting address bytes
   unsigned int startingAddress = ((frame[2] << 8) | frame[3]);
-  if (startingAddress < coilsSize) // check exception 2 ILLEGAL DATA ADDRESS
+  if (startingAddress < coilsSize) // chec/k exception 2 ILLEGAL DATA ADDRESS
   {
     exceptionResponse(2); // exception 2 ILLEGAL DATA ADDRESS
   }
@@ -268,22 +282,25 @@ unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
   buffer_size = process_serial_data();
   if (buffer_size == BUFFER_ERROR)
   {
+    Serial.println("BUFFER_ERROR");
     return errorCount++;
   }
 	
+  broadcastFlag = is_broadcast_message();
   if (!destined_for_me())
   {
+    Serial.println("Different Modbus ID");
     return errorCount;
   }
 
   // The minimum request packet is 8 bytes for function 3 & 16
   if (verify_frame_size(buffer_size) == false)
   {
+    Serial.println("Packet size below minimum");
     return errorCount++;
   }
 
   
-  broadcastFlag = is_broadcast_message();
   function_code = frame[FUNCTION_CODE_POSITION];
   if (!verify_broadcast_and_function_code())
   {
@@ -297,12 +314,16 @@ unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
   }
 
       
+  Serial.print("Function Code: ");
+  Serial.println(function_code, HEX);
   if (function_code == 1)
   {
     read_coils(coils);
   }
   else if (function_code == 3)
   {
+    Serial.print("Function Code: ");
+    Serial.println(function_code);
     read_holding_registers(holdingRegs);
   }
   else if (function_code == 6)

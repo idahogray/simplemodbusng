@@ -74,7 +74,6 @@ bool verify_crc(unsigned char buffer_size)
   return calculateCRC(buffer_size - 2) == crc;
 }
 
-
 bool verify_frame_size(unsigned char buffer_size)
 {
   if (frame[FUNCTION_CODE_POSITION] == 1 || frame[FUNCTION_CODE_POSITION] == 3 ||
@@ -167,6 +166,42 @@ void read_coils(bool *coils)
   {
     exceptionResponse(3); // exception 3 ILLEGAL DATA VALUE
   }
+
+  unsigned char noOfBytes = no_of_coils / 8;
+  if (no_of_coils % 8 > 0)
+  {
+    noOfBytes += 1;
+  }
+  unsigned char responseFrameSize = 5 + noOfBytes;
+  unsigned char address;
+  unsigned char index;
+  unsigned char crc16;
+  frame[0] = slaveID;
+  frame[1] = function_code;
+  frame[2] = noOfBytes;
+  address = 3;
+  unsigned char temp;
+  unsigned char bit_position = 0;
+  unsigned char val;
+
+  for (index = startingAddress; index < maxData; index++)
+  {
+    if (index % 8 == 0)
+    {
+      frame[address] = temp;
+      temp = 0;
+      address++;
+    }
+    if (coils[index] == true)
+    {
+      val = 1 << (index % 8);
+    }
+    else
+    {
+      val = 0;
+    }
+    temp |= val;
+  }
 }
 
 void read_holding_registers(unsigned int *holdingRegs)
@@ -187,7 +222,8 @@ void read_holding_registers(unsigned int *holdingRegs)
   }
 
   unsigned char noOfBytes = no_of_registers * 2;
-  unsigned char responseFrameSize = 5 + noOfBytes; // ID, function, noOfBytes, (dataLo + dataHi) * number of registers, crcLo, crcHi
+  // ID, function, noOfBytes, (dataLo + dataHi) * number of registers, crcLo, crcHi
+  unsigned char responseFrameSize = 5 + noOfBytes;
   unsigned char address;
   unsigned char index;
   unsigned int crc16;

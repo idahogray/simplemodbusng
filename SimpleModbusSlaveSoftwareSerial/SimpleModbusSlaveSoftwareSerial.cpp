@@ -34,7 +34,7 @@ void sendPacket(unsigned char bufferSize);
 
 SoftwareSerial mySerial(10, 11);
 
-bool process_serial_data()
+unsigned char process_serial_data()
 {
   unsigned char buffer_position = 0;
   unsigned char overflow = 0;
@@ -54,6 +54,8 @@ bool process_serial_data()
       frame[buffer_position] = mySerial.read();
       Serial.println(frame[buffer_position], HEX);
       buffer_position++;
+      Serial.print("buffer_position: 0x");
+      Serial.println(buffer_position, HEX);
     }
     delayMicroseconds(T1_5); // inter character time out
   }
@@ -64,6 +66,8 @@ bool process_serial_data()
   if (overflow)
     return BUFFER_ERROR;
   else
+    Serial.print("buffer_position: 0x");
+    Serial.println(buffer_position, HEX);
     return buffer_position;
 }
 
@@ -79,6 +83,10 @@ bool verify_frame_size(unsigned char buffer_size)
   if (frame[FUNCTION_CODE_POSITION] == 1 || frame[FUNCTION_CODE_POSITION] == 3 ||
       frame[FUNCTION_CODE_POSITION] == 5 || frame[FUNCTION_CODE_POSITION] == 6)
   {
+    Serial.print("Function Code: 0x");
+    Serial.println(frame[FUNCTION_CODE_POSITION], HEX);
+    Serial.print("Buffer Size: 0x");
+    Serial.println(buffer_size, HEX);
     if (buffer_size < 8)
     {
       return false;
@@ -208,17 +216,25 @@ void read_holding_registers(unsigned int *holdingRegs)
 {
   // combine the starting address bytes
   unsigned int startingAddress = ((frame[2] << 8) | frame[3]);
-  if (startingAddress < holdingRegsSize) // check exception 2 ILLEGAL DATA ADDRESS
+  Serial.print("Starting Address: 0x");
+  Serial.println(startingAddress, HEX);
+  if (startingAddress >= holdingRegsSize) // check exception 2 ILLEGAL DATA ADDRESS
   {
     exceptionResponse(2); // exception 2 ILLEGAL DATA ADDRESS
+    return;
   }
 
   // combine the number of register bytes  
   unsigned int no_of_registers = ((frame[4] << 8) | frame[5]);
+  Serial.print("no_of_registers: 0x");
+  Serial.println(no_of_registers, HEX);
   unsigned int maxData = startingAddress + no_of_registers;
-  if (maxData <= holdingRegsSize) // check exception 3 ILLEGAL DATA VALUE
+  Serial.print("maxData: 0x");
+  Serial.println(maxData, HEX);
+  if (maxData >= holdingRegsSize) // check exception 3 ILLEGAL DATA VALUE
   {
     exceptionResponse(3); // exception 3 ILLEGAL DATA VALUE
+    return;
   }
 
   unsigned char noOfBytes = no_of_registers * 2;
@@ -233,19 +249,30 @@ void read_holding_registers(unsigned int *holdingRegs)
   address = 3; // PDU starts at the 4th byte
   unsigned int temp;
   
+  Serial.print("noOfBytes: 0x");
+  Serial.println(noOfBytes, HEX);
+  Serial.print("maxData: 0x");
+  Serial.println(maxData, HEX);
   for (index = startingAddress; index < maxData; index++)
   {
+    Serial.print("Frame Index: 0x");
+    Serial.println(index, HEX);
     temp = holdingRegs[index];
     frame[address] = temp >> 8; // split the register into 2 bytes
+    Serial.print("Frame Value: 0x");
+    Serial.println(frame[address], HEX);
     address++;
     frame[address] = temp & 0xFF;
     address++;
+    Serial.print("Frame Value: 0x");
+    Serial.println(frame[address], HEX);
   } 
   
   crc16 = calculateCRC(responseFrameSize - 2);
   frame[responseFrameSize - 2] = crc16 >> 8; // split crc into 2 bytes
   frame[responseFrameSize - 1] = crc16 & 0xFF;
   sendPacket(responseFrameSize);
+  Serial.println("Response Sent");
 }
 
 void write_single_register(unsigned int *holdingRegs)
@@ -316,12 +343,17 @@ unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
   unsigned char buffer_size = 0;
 
   buffer_size = process_serial_data();
+  Serial.print("Buffer Size: 0x");
+  Serial.println(buffer_size, HEX);
   if (buffer_size == BUFFER_ERROR)
   {
     Serial.println("BUFFER_ERROR");
     return errorCount++;
   }
 	
+
+  Serial.print("Frame[4]: 0x");
+  Serial.println(frame[4], HEX);
   broadcastFlag = is_broadcast_message();
   if (!destined_for_me())
   {
@@ -329,6 +361,8 @@ unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
     return errorCount;
   }
 
+  Serial.print("Frame[4]: 0x");
+  Serial.println(frame[4], HEX);
   // The minimum request packet is 8 bytes for function 3 & 16
   if (verify_frame_size(buffer_size) == false)
   {
@@ -337,6 +371,8 @@ unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
   }
 
   
+  Serial.print("Frame[4]: 0x");
+  Serial.println(frame[4], HEX);
   function_code = frame[FUNCTION_CODE_POSITION];
   if (!verify_broadcast_and_function_code())
   {
@@ -350,6 +386,18 @@ unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
   }
 
       
+  Serial.print("Frame[0]: 0x");
+  Serial.println(frame[0], HEX);
+  Serial.print("Frame[1]: 0x");
+  Serial.println(frame[1], HEX);
+  Serial.print("Frame[2]: 0x");
+  Serial.println(frame[2], HEX);
+  Serial.print("Frame[3]: 0x");
+  Serial.println(frame[3], HEX);
+  Serial.print("Frame[4]: 0x");
+  Serial.println(frame[4], HEX);
+  Serial.print("Frame[5]: 0x");
+  Serial.println(frame[5], HEX);
   Serial.print("Function Code: ");
   Serial.println(function_code, HEX);
   if (function_code == 1)
@@ -359,7 +407,7 @@ unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
   else if (function_code == 3)
   {
     Serial.print("Function Code: ");
-    Serial.println(function_code);
+    Serial.println(function_code, HEX);
     read_holding_registers(holdingRegs);
   }
   else if (function_code == 6)
@@ -454,7 +502,11 @@ void sendPacket(unsigned char bufferSize)
     digitalWrite(TxEnablePin, HIGH);
     
   for (unsigned char i = 0; i < bufferSize; i++)
+  {
     mySerial.write(frame[i]);
+    Serial.print("Byte Sent: 0x");
+    Serial.println(frame[i], HEX);
+  }
     
   mySerial.flush();
   

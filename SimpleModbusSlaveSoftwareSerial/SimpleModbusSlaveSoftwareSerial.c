@@ -1,7 +1,5 @@
 #include "SimpleModbusSlaveSoftwareSerial.h"
-#include "SoftwareSerial.h"
 
-#define BUFFER_SIZE 128
 
 const char BROADCAST_ADDRESS = 0;
 const char SLAVE_ID_POSITION = 0;
@@ -27,53 +25,10 @@ unsigned int errorCount;
 unsigned int T1_5; // inter character time out
 unsigned int T3_5; // frame delay
 
-struct modbus_response {
-    unsigned int error_count;
-    unsigned char frame[BUFFER_SIZE];
-}
-
-// function definitions
-void exceptionResponse(unsigned char exception);
-unsigned int calculateCRC(unsigned char bufferSize); 
-void sendPacket(unsigned char bufferSize);
-
-SoftwareSerial mySerial(10, 11);
-
-unsigned char process_serial_data()
+struct modbus_response modbus_update()
 {
-  unsigned char buffer_position = 0;
-  unsigned char overflow = 0;
-  
-  while (mySerial.available())
-  {
-    Serial.print("Reading Data from serial port: 0x");
-    // The maximum number of bytes is limited to the serial buffer size of 128 bytes
-    // If more bytes is received than the BUFFER_SIZE the overflow flag will be set and the 
-    // serial buffer will be red untill all the data is cleared from the receive buffer.
-    if (overflow) 
-      mySerial.read();
-    else
-    {
-      if (buffer_position == BUFFER_SIZE)
-        overflow = 1;
-      frame[buffer_position] = mySerial.read();
-      Serial.println(frame[buffer_position], HEX);
-      buffer_position++;
-      Serial.print("buffer_position: 0x");
-      Serial.println(buffer_position, HEX);
-    }
-    delayMicroseconds(T1_5); // inter character time out
-  }
-  
-  // If an overflow occurred increment the errorCount
-  // variable and return to the main sketch without 
-  // responding to the request i.e. force a timeout
-  if (overflow)
-    return BUFFER_ERROR;
-  else
-    Serial.print("buffer_position: 0x");
-    Serial.println(buffer_position, HEX);
-    return buffer_position;
+    struct modbus_response response = { 0, { 0 } };
+    return response;
 }
 
 bool verify_crc(unsigned char buffer_size)
@@ -83,15 +38,17 @@ bool verify_crc(unsigned char buffer_size)
   return calculateCRC(buffer_size - 2) == crc;
 }
 
-bool verify_frame_size(unsigned char buffer_size)
+bool verify_frame_size(unsigned char *frame, unsigned char buffer_size)
 {
   if (frame[FUNCTION_CODE_POSITION] == 1 || frame[FUNCTION_CODE_POSITION] == 3 ||
       frame[FUNCTION_CODE_POSITION] == 5 || frame[FUNCTION_CODE_POSITION] == 6)
   {
+#ifdef DEBUG
     Serial.print("Function Code: 0x");
     Serial.println(frame[FUNCTION_CODE_POSITION], HEX);
     Serial.print("Buffer Size: 0x");
     Serial.println(buffer_size, HEX);
+#endif
     if (buffer_size < 8)
     {
       return false;
@@ -113,25 +70,31 @@ bool verify_frame_size(unsigned char buffer_size)
       return true;
     }
   }
+  else
+  {
+      return false;
+  }
 }
 
-unsigned char get_slave_id()
+unsigned char get_slave_id(unsigned char *frame)
 {
   return frame[SLAVE_ID_POSITION];
 }
 
-bool verify_slave_id_matches()
+bool verify_slave_id_matches(unsigned char *frame)
 {
-  return get_slave_id() == slaveID;
+  return get_slave_id(frame) == slaveID;
 }
 
-bool is_broadcast_message()
+bool is_broadcast_message(unsigned char *frame)
 {
+#ifdef DEBUG
   Serial.print("Slave ID: 0x");
-  Serial.println(get_slave_id(), HEX);
+  Serial.println(get_slave_id(frame), HEX);
   Serial.print("Broadcast Address: 0x");
   Serial.println(BROADCAST_ADDRESS, HEX);
-  return get_slave_id() == BROADCAST_ADDRESS;
+#endif
+  return get_slave_id(frame) == BROADCAST_ADDRESS;
 }
 
 bool verify_broadcast_and_function_code()
@@ -148,13 +111,15 @@ bool verify_broadcast_and_function_code()
   }
 }
 
-bool destined_for_me()
+bool destined_for_me(unsigned char *frame)
 {
+#ifdef DEBUG
   Serial.print("Verify Slave ID Matches: 0x");
-  Serial.println(verify_slave_id_matches(), HEX);
+  Serial.println(verify_slave_id_matches(frame), HEX);
   Serial.print("Broadcast Flag: 0x");
   Serial.println(broadcastFlag, HEX);
-  if (verify_slave_id_matches() || broadcastFlag)
+#endif
+  if (verify_slave_id_matches(frame) || broadcastFlag)
   {
     return true;
   }
@@ -221,8 +186,10 @@ void read_holding_registers(unsigned int *holdingRegs)
 {
   // combine the starting address bytes
   unsigned int startingAddress = ((frame[2] << 8) | frame[3]);
+#ifdef DEBUG
   Serial.print("Starting Address: 0x");
   Serial.println(startingAddress, HEX);
+#endif
   if (startingAddress >= holdingRegsSize) // check exception 2 ILLEGAL DATA ADDRESS
   {
     exceptionResponse(2); // exception 2 ILLEGAL DATA ADDRESS
@@ -231,11 +198,13 @@ void read_holding_registers(unsigned int *holdingRegs)
 
   // combine the number of register bytes  
   unsigned int no_of_registers = ((frame[4] << 8) | frame[5]);
+  unsigned int maxData = startingAddress + no_of_registers;
+#ifdef DEBUG
   Serial.print("no_of_registers: 0x");
   Serial.println(no_of_registers, HEX);
-  unsigned int maxData = startingAddress + no_of_registers;
   Serial.print("maxData: 0x");
   Serial.println(maxData, HEX);
+#endif
   if (maxData >= holdingRegsSize) // check exception 3 ILLEGAL DATA VALUE
   {
     exceptionResponse(3); // exception 3 ILLEGAL DATA VALUE
@@ -254,30 +223,39 @@ void read_holding_registers(unsigned int *holdingRegs)
   address = 3; // PDU starts at the 4th byte
   unsigned int temp;
   
+#ifdef DEBUG
   Serial.print("noOfBytes: 0x");
   Serial.println(noOfBytes, HEX);
   Serial.print("maxData: 0x");
   Serial.println(maxData, HEX);
+#endif
   for (index = startingAddress; index < maxData; index++)
   {
+#ifdef DEBUG
     Serial.print("Frame Index: 0x");
     Serial.println(index, HEX);
+#endif
     temp = holdingRegs[index];
     frame[address] = temp >> 8; // split the register into 2 bytes
+#ifdef DEBUG
     Serial.print("Frame Value: 0x");
     Serial.println(frame[address], HEX);
+#endif
     address++;
     frame[address] = temp & 0xFF;
     address++;
+#ifdef DEBUG
     Serial.print("Frame Value: 0x");
     Serial.println(frame[address], HEX);
+#endif
   } 
   
   crc16 = calculateCRC(responseFrameSize - 2);
   frame[responseFrameSize - 2] = crc16 >> 8; // split crc into 2 bytes
   frame[responseFrameSize - 1] = crc16 & 0xFF;
-  sendPacket(responseFrameSize);
+#ifdef DEBUG
   Serial.println("Response Sent");
+#endif
 }
 
 void write_single_register(unsigned int *holdingRegs)
@@ -296,7 +274,6 @@ void write_single_register(unsigned int *holdingRegs)
   crc16 = calculateCRC(responseFrameSize - 2);
   frame[responseFrameSize - 2] = crc16 >> 8; // split crc into 2 bytes
   frame[responseFrameSize - 1] = crc16 & 0xFF;
-  sendPacket(responseFrameSize);
 }
 
 void write_multiple_registers(unsigned int *holdingRegs, unsigned char buffer_size)
@@ -329,9 +306,6 @@ void write_multiple_registers(unsigned int *holdingRegs, unsigned char buffer_si
         frame[6] = crc16 >> 8; // split crc into 2 bytes
         frame[7] = crc16 & 0xFF;
         
-        // a function_code 16 response is an echo of the first 6 bytes from the request + 2 crc bytes
-        if (!broadcastFlag) // don't respond if it's a broadcast message
-          sendPacket(8); 
       }
       else  
         exceptionResponse(3); // exception 3 ILLEGAL DATA VALUE
@@ -343,91 +317,6 @@ void write_multiple_registers(unsigned int *holdingRegs, unsigned char buffer_si
     errorCount++; // corrupted packet
 }
 
-unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
-{
-    struct modbus_response response = {
-        0,
-        { 0 }
-    };
-    unsigned char buffer_size = 0;
-
-    buffer_size = process_serial_data();
-    Serial.print("Buffer Size: 0x");
-    Serial.println(buffer_size, HEX);
-    if (buffer_size == BUFFER_ERROR)
-    {
-        Serial.println("BUFFER_ERROR");
-        return errorCount++;
-    }
-
-
-    Serial.print("Frame[4]: 0x");
-    Serial.println(frame[4], HEX);
-    broadcastFlag = is_broadcast_message();
-    if (!destined_for_me())
-    {
-        Serial.println("Different Modbus ID");
-        return errorCount;
-    }
-
-    Serial.print("Frame[4]: 0x");
-    Serial.println(frame[4], HEX);
-    // The minimum request packet is 8 bytes for function 3 & 16
-    if (verify_frame_size(buffer_size) == false)
-    {
-        Serial.println("Packet size below minimum");
-        return errorCount++;
-    }
-
-
-    Serial.print("Frame[4]: 0x");
-    Serial.println(frame[4], HEX);
-    function_code = frame[FUNCTION_CODE_POSITION];
-    if (!verify_broadcast_and_function_code())
-    {
-      exceptionResponse(1); // exception 1 ILLEGAL FUNCTION
-      return errorCount++;
-    }
-
-    if (!verify_crc(buffer_size))
-    {
-        return errorCount++;
-    }
-
-      
-    Serial.print("Frame[0]: 0x");
-    Serial.println(frame[0], HEX);
-    Serial.print("Frame[1]: 0x");
-    Serial.println(frame[1], HEX);
-    Serial.print("Frame[2]: 0x");
-    Serial.println(frame[2], HEX);
-    Serial.print("Frame[3]: 0x");
-    Serial.println(frame[3], HEX);
-    Serial.print("Frame[4]: 0x");
-    Serial.println(frame[4], HEX);
-    Serial.print("Frame[5]: 0x");
-    Serial.println(frame[5], HEX);
-    Serial.print("Function Code: ");
-    Serial.println(function_code, HEX);
-    if (function_code == 1)
-    {
-        read_coils(coils);
-    }
-    else if (function_code == 3)
-    {
-        Serial.print("Function Code: ");
-        Serial.println(function_code, HEX);
-        read_holding_registers(holdingRegs);
-    }
-    else if (function_code == 6)
-    {
-        write_single_register(holdingRegs);
-    }
-    else if (function_code == 16)
-    {
-        write_multiple_registers(holdingRegs, buffer_size);
-    }         
-}       
 
 void exceptionResponse(unsigned char exception)
 {
@@ -440,48 +329,8 @@ void exceptionResponse(unsigned char exception)
     unsigned int crc16 = calculateCRC(3); // ID, function_code + 0x80, exception code == 3 bytes
     frame[3] = crc16 >> 8;
     frame[4] = crc16 & 0xFF;
-    sendPacket(5); // exception response is always 5 bytes ID, function_code + 0x80, exception code, 2 bytes crc
   }
 }
-
-void modbus_configure(
-  long baud, unsigned char _slaveID, unsigned char _TxEnablePin, 
-  unsigned int _holdingRegsSize, unsigned int _coilsSize)
-{
-  slaveID = _slaveID;
-  mySerial.begin(baud);
-  
-  if (_TxEnablePin > 1) 
-  { // pin 0 & pin 1 are reserved for RX/TX. To disable set txenpin < 2
-    TxEnablePin = _TxEnablePin; 
-    pinMode(TxEnablePin, OUTPUT);
-    digitalWrite(TxEnablePin, LOW);
-  }
-  
-  // Modbus states that a baud rate higher than 19200 must use a fixed 750 us 
-  // for inter character time out and 1.75 ms for a frame delay.
-  // For baud rates below 19200 the timeing is more critical and has to be calculated.
-  // E.g. 9600 baud in a 10 bit packet is 960 characters per second
-  // In milliseconds this will be 960characters per 1000ms. So for 1 character
-  // 1000ms/960characters is 1.04167ms per character and finaly modbus states an
-  // intercharacter must be 1.5T or 1.5 times longer than a normal character and thus
-  // 1.5T = 1.04167ms * 1.5 = 1.5625ms. A frame delay is 3.5T.
-  
-  if (baud > 19200)
-  {
-    T1_5 = 150; 
-    T3_5 = 350; 
-  }
-  else 
-  {
-    T1_5 = 15000000/baud; // 1T * 1.5 = T1.5
-    T3_5 = 35000000/baud; // 1T * 3.5 = T3.5
-  }
-  
-  holdingRegsSize = _holdingRegsSize;
-  coilsSize = _coilsSize;
-  errorCount = 0; // initialize errorCount
-}   
 
 unsigned int calculateCRC(byte bufferSize) 
 {
@@ -503,25 +352,4 @@ unsigned int calculateCRC(byte bufferSize)
   temp = (temp << 8) | temp2;
   temp &= 0xFFFF;
   return temp; // the returned value is already swopped - crcLo byte is first & crcHi byte is last
-}
-
-void sendPacket(unsigned char bufferSize)
-{
-  if (TxEnablePin > 1)
-    digitalWrite(TxEnablePin, HIGH);
-    
-  for (unsigned char i = 0; i < bufferSize; i++)
-  {
-    mySerial.write(frame[i]);
-    Serial.print("Byte Sent: 0x");
-    Serial.println(frame[i], HEX);
-  }
-    
-  mySerial.flush();
-  
-  // allow a frame delay to indicate end of transmission
-  delayMicroseconds(T3_5); 
-  
-  if (TxEnablePin > 1)
-    digitalWrite(TxEnablePin, LOW);
 }

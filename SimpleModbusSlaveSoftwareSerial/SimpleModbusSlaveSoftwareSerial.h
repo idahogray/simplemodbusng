@@ -79,14 +79,30 @@
  http://www.modbus.org/docs/PI_MBUS_300.pdf
 */
 
-#include "Arduino.h"
-#include "SoftwareSerial.h"
+#include <stdbool.h>
+
+#define BUFFER_SIZE 128
+
+typedef unsigned char byte;
+
+struct modbus_response {
+    unsigned int error_count;
+    unsigned char frame[BUFFER_SIZE];
+};
+
+
 
 // function definitions
+unsigned char get_slave_id(unsigned char *frame);
+void exceptionResponse(unsigned char exception);
+unsigned int calculateCRC(unsigned char bufferSize); 
+bool verify_crc(unsigned char buffer_size);
+bool verify_frame_size(unsigned char *frame, unsigned char buffer_size);
+
 void modbus_configure(
   long baud, byte _slaveID, byte _TxEnablePin, 
   unsigned int _holdingRegsSize, unsigned int _coilsSize);
-unsigned int modbus_update(unsigned int *holdingRegs, bool *coils);
+struct modbus_response modbus_update();
  
 
 #endif

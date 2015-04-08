@@ -27,6 +27,11 @@ unsigned int errorCount;
 unsigned int T1_5; // inter character time out
 unsigned int T3_5; // frame delay
 
+struct modbus_response {
+    unsigned int error_count;
+    unsigned char frame[BUFFER_SIZE];
+}
+
 // function definitions
 void exceptionResponse(unsigned char exception);
 unsigned int calculateCRC(unsigned char bufferSize); 
@@ -340,84 +345,88 @@ void write_multiple_registers(unsigned int *holdingRegs, unsigned char buffer_si
 
 unsigned int modbus_update(unsigned int *holdingRegs, bool *coils)
 {
-  unsigned char buffer_size = 0;
+    struct modbus_response response = {
+        0,
+        { 0 }
+    };
+    unsigned char buffer_size = 0;
 
-  buffer_size = process_serial_data();
-  Serial.print("Buffer Size: 0x");
-  Serial.println(buffer_size, HEX);
-  if (buffer_size == BUFFER_ERROR)
-  {
-    Serial.println("BUFFER_ERROR");
-    return errorCount++;
-  }
-	
+    buffer_size = process_serial_data();
+    Serial.print("Buffer Size: 0x");
+    Serial.println(buffer_size, HEX);
+    if (buffer_size == BUFFER_ERROR)
+    {
+        Serial.println("BUFFER_ERROR");
+        return errorCount++;
+    }
 
-  Serial.print("Frame[4]: 0x");
-  Serial.println(frame[4], HEX);
-  broadcastFlag = is_broadcast_message();
-  if (!destined_for_me())
-  {
-    Serial.println("Different Modbus ID");
-    return errorCount;
-  }
 
-  Serial.print("Frame[4]: 0x");
-  Serial.println(frame[4], HEX);
-  // The minimum request packet is 8 bytes for function 3 & 16
-  if (verify_frame_size(buffer_size) == false)
-  {
-    Serial.println("Packet size below minimum");
-    return errorCount++;
-  }
+    Serial.print("Frame[4]: 0x");
+    Serial.println(frame[4], HEX);
+    broadcastFlag = is_broadcast_message();
+    if (!destined_for_me())
+    {
+        Serial.println("Different Modbus ID");
+        return errorCount;
+    }
 
-  
-  Serial.print("Frame[4]: 0x");
-  Serial.println(frame[4], HEX);
-  function_code = frame[FUNCTION_CODE_POSITION];
-  if (!verify_broadcast_and_function_code())
-  {
+    Serial.print("Frame[4]: 0x");
+    Serial.println(frame[4], HEX);
+    // The minimum request packet is 8 bytes for function 3 & 16
+    if (verify_frame_size(buffer_size) == false)
+    {
+        Serial.println("Packet size below minimum");
+        return errorCount++;
+    }
+
+
+    Serial.print("Frame[4]: 0x");
+    Serial.println(frame[4], HEX);
+    function_code = frame[FUNCTION_CODE_POSITION];
+    if (!verify_broadcast_and_function_code())
+    {
       exceptionResponse(1); // exception 1 ILLEGAL FUNCTION
       return errorCount++;
-  }
+    }
 
-  if (!verify_crc(buffer_size))
-  {
-    return errorCount++;
-  }
+    if (!verify_crc(buffer_size))
+    {
+        return errorCount++;
+    }
 
       
-  Serial.print("Frame[0]: 0x");
-  Serial.println(frame[0], HEX);
-  Serial.print("Frame[1]: 0x");
-  Serial.println(frame[1], HEX);
-  Serial.print("Frame[2]: 0x");
-  Serial.println(frame[2], HEX);
-  Serial.print("Frame[3]: 0x");
-  Serial.println(frame[3], HEX);
-  Serial.print("Frame[4]: 0x");
-  Serial.println(frame[4], HEX);
-  Serial.print("Frame[5]: 0x");
-  Serial.println(frame[5], HEX);
-  Serial.print("Function Code: ");
-  Serial.println(function_code, HEX);
-  if (function_code == 1)
-  {
-    read_coils(coils);
-  }
-  else if (function_code == 3)
-  {
+    Serial.print("Frame[0]: 0x");
+    Serial.println(frame[0], HEX);
+    Serial.print("Frame[1]: 0x");
+    Serial.println(frame[1], HEX);
+    Serial.print("Frame[2]: 0x");
+    Serial.println(frame[2], HEX);
+    Serial.print("Frame[3]: 0x");
+    Serial.println(frame[3], HEX);
+    Serial.print("Frame[4]: 0x");
+    Serial.println(frame[4], HEX);
+    Serial.print("Frame[5]: 0x");
+    Serial.println(frame[5], HEX);
     Serial.print("Function Code: ");
     Serial.println(function_code, HEX);
-    read_holding_registers(holdingRegs);
-  }
-  else if (function_code == 6)
-  {
-    write_single_register(holdingRegs);
-  }
-  else if (function_code == 16)
-  {
-    write_multiple_registers(holdingRegs, buffer_size);
-  }         
+    if (function_code == 1)
+    {
+        read_coils(coils);
+    }
+    else if (function_code == 3)
+    {
+        Serial.print("Function Code: ");
+        Serial.println(function_code, HEX);
+        read_holding_registers(holdingRegs);
+    }
+    else if (function_code == 6)
+    {
+        write_single_register(holdingRegs);
+    }
+    else if (function_code == 16)
+    {
+        write_multiple_registers(holdingRegs, buffer_size);
+    }         
 }       
 
 void exceptionResponse(unsigned char exception)

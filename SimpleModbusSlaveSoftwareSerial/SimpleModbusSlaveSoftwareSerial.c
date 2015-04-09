@@ -1,3 +1,4 @@
+#include <assert.h>
 #include "SimpleModbusSlaveSoftwareSerial.h"
 
 
@@ -40,8 +41,12 @@ bool verify_crc(unsigned char buffer_size)
 
 bool verify_frame_size(unsigned char *frame, unsigned char buffer_size)
 {
-  if (frame[FUNCTION_CODE_POSITION] == 1 || frame[FUNCTION_CODE_POSITION] == 3 ||
-      frame[FUNCTION_CODE_POSITION] == 5 || frame[FUNCTION_CODE_POSITION] == 6)
+  if (
+        frame[FUNCTION_CODE_POSITION] == READ_COILS || 
+        frame[FUNCTION_CODE_POSITION] == READ_HOLDING_REGISTERS ||
+        frame[FUNCTION_CODE_POSITION] == WRITE_SINGLE_COIL ||
+        frame[FUNCTION_CODE_POSITION] == WRITE_SINGLE_REGISTER
+    )
   {
 #ifdef DEBUG
     Serial.print("Function Code: 0x");
@@ -58,8 +63,8 @@ bool verify_frame_size(unsigned char *frame, unsigned char buffer_size)
       return true;
     }
   }
-  else if (frame[FUNCTION_CODE_POSITION] == 15 || 
-            frame[FUNCTION_CODE_POSITION] == 16)
+  else if (frame[FUNCTION_CODE_POSITION] == WRITE_MULTIPLE_COILS || 
+            frame[FUNCTION_CODE_POSITION] == WRITE_MULTIPLE_REGISTERS)
   {
     if (buffer_size < 10)
     {
@@ -76,25 +81,28 @@ bool verify_frame_size(unsigned char *frame, unsigned char buffer_size)
   }
 }
 
-unsigned char get_slave_id(unsigned char *frame)
+unsigned char get_slave_id(unsigned char *frame, unsigned char buffer_size)
 {
-  return frame[SLAVE_ID_POSITION];
+    assert(buffer_size > SLAVE_ID_POSITION);
+    unsigned char slave_id = frame[SLAVE_ID_POSITION];
+    assert(slave_id >= 0 && slave_id < 248);
+    return slave_id;
 }
 
-bool verify_slave_id_matches(unsigned char *frame)
+bool verify_slave_id_matches(unsigned char *frame, unsigned char buffer_size, unsigned char slave_id)
 {
-  return get_slave_id(frame) == slaveID;
+  return get_slave_id(frame, buffer_size) == slave_id;
 }
 
 bool is_broadcast_message(unsigned char *frame)
 {
 #ifdef DEBUG
   Serial.print("Slave ID: 0x");
-  Serial.println(get_slave_id(frame), HEX);
+  Serial.println(get_slave_id(frame, sizeof(frame)), HEX);
   Serial.print("Broadcast Address: 0x");
   Serial.println(BROADCAST_ADDRESS, HEX);
 #endif
-  return get_slave_id(frame) == BROADCAST_ADDRESS;
+  return get_slave_id(frame, sizeof(frame)) == BROADCAST_ADDRESS;
 }
 
 bool verify_broadcast_and_function_code()
@@ -111,15 +119,15 @@ bool verify_broadcast_and_function_code()
   }
 }
 
-bool destined_for_me(unsigned char *frame)
+bool destined_for_me(unsigned char *frame, unsigned char frame_size, unsigned char my_slave_id)
 {
 #ifdef DEBUG
   Serial.print("Verify Slave ID Matches: 0x");
-  Serial.println(verify_slave_id_matches(frame), HEX);
+  Serial.println(verify_slave_id_matches(frame, frame_size, my_slave_id), HEX);
   Serial.print("Broadcast Flag: 0x");
   Serial.println(broadcastFlag, HEX);
 #endif
-  if (verify_slave_id_matches(frame) || broadcastFlag)
+  if (verify_slave_id_matches(frame, frame_size, my_slave_id) || broadcastFlag)
   {
     return true;
   }

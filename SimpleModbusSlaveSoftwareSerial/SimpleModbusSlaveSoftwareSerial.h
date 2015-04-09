@@ -93,7 +93,8 @@ struct modbus_response {
 
 
 // function definitions
-unsigned char get_slave_id(unsigned char *frame);
+unsigned char get_slave_id(unsigned char *frame, unsigned char frame_size);
+bool verify_slave_id_matches(unsigned char *frame, unsigned char buffer_size, unsigned char slave_id);
 void exceptionResponse(unsigned char exception);
 unsigned int calculateCRC(unsigned char bufferSize); 
 bool verify_crc(unsigned char buffer_size);

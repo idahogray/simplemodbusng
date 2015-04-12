@@ -1,26 +1,25 @@
 #include <assert.h>
+#include <stdio.h>
 #include "SimpleModbusSlaveSoftwareSerial.h"
 
 
-const char BROADCAST_ADDRESS = 0;
-const char SLAVE_ID_POSITION = 0;
-const char FUNCTION_CODE_POSITION = 1;
+const unsigned char BROADCAST_ADDRESS = 0;
+const unsigned char SLAVE_ID_POSITION = 0;
+const unsigned char FUNCTION_CODE_POSITION = 1;
 const char BUFFER_ERROR = -1;
-const char READ_COILS = 1;
-const char READ_HOLDING_REGISTERS = 3;
-const char WRITE_SINGLE_COIL = 5;
-const char WRITE_SINGLE_REGISTER = 6;
-const char WRITE_MULTIPLE_COILS = 15;
-const char WRITE_MULTIPLE_REGISTERS = 16;
+const unsigned char READ_COILS = 1;
+const unsigned char READ_HOLDING_REGISTERS = 3;
+const unsigned char WRITE_SINGLE_COIL = 5;
+const unsigned char WRITE_SINGLE_REGISTER = 6;
+const unsigned char WRITE_MULTIPLE_COILS = 15;
+const unsigned char WRITE_MULTIPLE_REGISTERS = 16;
 
 // frame[] is used to recieve and transmit packages. 
 // The maximum serial ring buffer size is 128
 unsigned char frame[BUFFER_SIZE];
 unsigned int holdingRegsSize; // size of the register array 
 unsigned int coilsSize; // size of the register array 
-unsigned char broadcastFlag;
 unsigned char slaveID;
-unsigned char function_code;
 unsigned char TxEnablePin;
 unsigned int errorCount;
 unsigned int T1_5; // inter character time out
@@ -32,11 +31,25 @@ struct modbus_response modbus_update()
     return response;
 }
 
-bool verify_crc(unsigned char buffer_size)
+unsigned char get_function_code(unsigned char *frame, unsigned char frame_size)
 {
-  // combine the crc Low & High bytes
-  unsigned int crc = ((frame[buffer_size - 2] << 8) | frame[buffer_size - 1]);
-  return calculateCRC(buffer_size - 2) == crc;
+    assert(frame_size >= FUNCTION_CODE_POSITION);
+    unsigned char function_code = frame[FUNCTION_CODE_POSITION];
+    assert(
+        function_code == READ_COILS || 
+        function_code == READ_HOLDING_REGISTERS ||
+        function_code == WRITE_SINGLE_COIL ||
+        function_code == WRITE_SINGLE_REGISTER ||
+        function_code == WRITE_MULTIPLE_COILS ||
+        function_code == WRITE_MULTIPLE_REGISTERS
+    );
+    return function_code;
+}
+
+bool verify_crc(unsigned char *frame, unsigned char frame_size)
+{
+  unsigned int crc = ((frame[frame_size - 2] << 8) | frame[frame_size - 1]);
+  return calculate_crc(frame, frame_size - 2) == crc;
 }
 
 bool verify_frame_size(unsigned char *frame, unsigned char buffer_size)
@@ -48,12 +61,6 @@ bool verify_frame_size(unsigned char *frame, unsigned char buffer_size)
         frame[FUNCTION_CODE_POSITION] == WRITE_SINGLE_REGISTER
     )
   {
-#ifdef DEBUG
-    Serial.print("Function Code: 0x");
-    Serial.println(frame[FUNCTION_CODE_POSITION], HEX);
-    Serial.print("Buffer Size: 0x");
-    Serial.println(buffer_size, HEX);
-#endif
     if (buffer_size < 8)
     {
       return false;
@@ -94,50 +101,36 @@ bool verify_slave_id_matches(unsigned char *frame, unsigned char buffer_size, un
   return get_slave_id(frame, buffer_size) == slave_id;
 }
 
-bool is_broadcast_message(unsigned char *frame)
+bool is_broadcast_message(unsigned char *frame, unsigned char frame_size)
 {
-#ifdef DEBUG
-  Serial.print("Slave ID: 0x");
-  Serial.println(get_slave_id(frame, sizeof(frame)), HEX);
-  Serial.print("Broadcast Address: 0x");
-  Serial.println(BROADCAST_ADDRESS, HEX);
-#endif
-  return get_slave_id(frame, sizeof(frame)) == BROADCAST_ADDRESS;
+  return get_slave_id(frame, frame_size) == BROADCAST_ADDRESS;
 }
 
-bool verify_broadcast_and_function_code()
+bool verify_broadcast_and_function_code(unsigned char *frame, unsigned char frame_size)
 {
-  if (broadcastFlag && (
-        function_code == READ_COILS || 
-        function_code == READ_HOLDING_REGISTERS))
-  {
-    return false;
-  }
-  else
-  {
+    bool is_broadcast = is_broadcast_message(frame, frame_size);
+    bool is_read_coils = get_function_code(frame, frame_size) == READ_COILS;
+    bool is_read_holding_registers = get_function_code(frame, frame_size) == READ_HOLDING_REGISTERS;
+    bool is_broadcast_and_read_coils = is_broadcast && is_read_coils;
+    bool is_broadcast_and_read_holding_registers = is_broadcast && is_read_holding_registers;
+    if (is_broadcast_and_read_coils || is_broadcast_and_read_holding_registers)
+        return false;
+
     return true;
-  }
 }
 
 bool destined_for_me(unsigned char *frame, unsigned char frame_size, unsigned char my_slave_id)
 {
-#ifdef DEBUG
-  Serial.print("Verify Slave ID Matches: 0x");
-  Serial.println(verify_slave_id_matches(frame, frame_size, my_slave_id), HEX);
-  Serial.print("Broadcast Flag: 0x");
-  Serial.println(broadcastFlag, HEX);
-#endif
-  if (verify_slave_id_matches(frame, frame_size, my_slave_id) || broadcastFlag)
-  {
-    return true;
-  }
-  else
-  {
+    bool slave_id_match = verify_slave_id_matches(frame, frame_size, my_slave_id);
+    bool broadcast = is_broadcast_message(frame, frame_size);
+    bool slave_id_match_or_broadcast = slave_id_match || broadcast;
+    if ( slave_id_match_or_broadcast )
+        return true;
+
     return false;
-  }
 }
 
-void read_coils(bool *coils)
+/*void read_coils(bool *coils)
 {
   // combine the starting address bytes
   unsigned int startingAddress = ((frame[2] << 8) | frame[3]);
@@ -163,7 +156,7 @@ void read_coils(bool *coils)
   unsigned char index;
   unsigned char crc16;
   frame[0] = slaveID;
-  frame[1] = function_code;
+  //frame[1] = function_code;
   frame[2] = noOfBytes;
   address = 3;
   unsigned char temp;
@@ -188,9 +181,9 @@ void read_coils(bool *coils)
     }
     temp |= val;
   }
-}
+}*/
 
-void read_holding_registers(unsigned int *holdingRegs)
+/*void read_holding_registers(unsigned int *holdingRegs)
 {
   // combine the starting address bytes
   unsigned int startingAddress = ((frame[2] << 8) | frame[3]);
@@ -226,7 +219,7 @@ void read_holding_registers(unsigned int *holdingRegs)
   unsigned char index;
   unsigned int crc16;
   frame[0] = slaveID;
-  frame[1] = function_code;
+  //frame[1] = function_code;
   frame[2] = noOfBytes;
   address = 3; // PDU starts at the 4th byte
   unsigned int temp;
@@ -264,9 +257,9 @@ void read_holding_registers(unsigned int *holdingRegs)
 #ifdef DEBUG
   Serial.println("Response Sent");
 #endif
-}
+}*/
 
-void write_single_register(unsigned int *holdingRegs)
+/*void write_single_register(unsigned int *holdingRegs)
 {
   unsigned int startingAddress = ((frame[2] << 8) | frame[3]);
   if (startingAddress < holdingRegsSize) // check exception 2 ILLEGAL DATA ADDRESS
@@ -282,9 +275,9 @@ void write_single_register(unsigned int *holdingRegs)
   crc16 = calculateCRC(responseFrameSize - 2);
   frame[responseFrameSize - 2] = crc16 >> 8; // split crc into 2 bytes
   frame[responseFrameSize - 1] = crc16 & 0xFF;
-}
+}*/
 
-void write_multiple_registers(unsigned int *holdingRegs, unsigned char buffer_size)
+/*void write_multiple_registers(unsigned int *holdingRegs, unsigned char buffer_size)
 {
   unsigned int startingAddress = ((frame[2] << 8) | frame[3]);
   // combine the number of register bytes  
@@ -323,28 +316,28 @@ void write_multiple_registers(unsigned int *holdingRegs, unsigned char buffer_si
   }
   else 
     errorCount++; // corrupted packet
-}
+}*/
 
 
-void exceptionResponse(unsigned char exception)
+/*void exceptionResponse(unsigned char exception, unsigned char *frame, unsigned char frame_size)
 {
   errorCount++; // each call to exceptionResponse() will increment the errorCount
-  if (!broadcastFlag) // don't respond if its a broadcast message
+  if (!is_broadcast_message(frame, frame_size)) // don't respond if its a broadcast message
   {
     frame[0] = slaveID;
-    frame[1] = (function_code | 0x80); // set the MSB bit high, informs the master of an exception
+    //frame[1] = (function_code | 0x80); // set the MSB bit high, informs the master of an exception
     frame[2] = exception;
     unsigned int crc16 = calculateCRC(3); // ID, function_code + 0x80, exception code == 3 bytes
     frame[3] = crc16 >> 8;
     frame[4] = crc16 & 0xFF;
   }
-}
+}*/
 
-unsigned int calculateCRC(byte bufferSize) 
+unsigned int calculate_crc(unsigned char *frame, unsigned char frame_size) 
 {
   unsigned int temp, temp2, flag;
   temp = 0xFFFF;
-  for (unsigned char i = 0; i < bufferSize; i++)
+  for (unsigned char i = 0; i < frame_size; i++)
   {
     temp = temp ^ frame[i];
     for (unsigned char j = 1; j <= 8; j++)
@@ -359,5 +352,5 @@ unsigned int calculateCRC(byte bufferSize)
   temp2 = temp >> 8;
   temp = (temp << 8) | temp2;
   temp &= 0xFFFF;
-  return temp; // the returned value is already swopped - crcLo byte is first & crcHi byte is last
+  return temp; // the returned value is already swapped - crcLo byte is first & crcHi byte is last
 }

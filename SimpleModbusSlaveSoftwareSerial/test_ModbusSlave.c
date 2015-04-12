@@ -143,12 +143,72 @@ int test_get_slave_id_247()
     return 0;
 }
 
+int test_get_function_code_1()
+{
+    unsigned char frame[2] ={ 247, 1 };
+    unsigned char frame_size = sizeof(frame);
+    unsigned char result = get_function_code(frame, frame_size);
+    printf("READ_COILS: %d\n", result);
+    assert(result == 1);
+    return 0;
+}
+
+int test_get_function_code_3()
+{
+    unsigned char frame[2] ={ 247, 3 };
+    unsigned char frame_size = sizeof(frame);
+    unsigned char result = get_function_code(frame, frame_size);
+    printf("READ_HOLDING_REGISTERS: %d\n", result);
+    assert(result == 3);
+    return 0;
+}
+
+int test_get_function_code_5()
+{
+    unsigned char frame[2] ={ 247, 5 };
+    unsigned char frame_size = sizeof(frame);
+    unsigned char result = get_function_code(frame, frame_size);
+    printf("WRITE_SINGLE_COIL: %d\n", result);
+    assert(result == 5);
+    return 0;
+}
+
+int test_get_function_code_6()
+{
+    unsigned char frame[2] ={ 247, 6 };
+    unsigned char frame_size = sizeof(frame);
+    unsigned char result = get_function_code(frame, frame_size);
+    printf("WRITE_SINGLE_HOLDING_REGISTER: %d\n", result);
+    assert(result == 6);
+    return 0;
+}
+
+int test_get_function_code_15()
+{
+    unsigned char frame[2] ={ 247, 15 };
+    unsigned char frame_size = sizeof(frame);
+    unsigned char result = get_function_code(frame, frame_size);
+    printf("WRITE_MULTIPLE_COILS: %d\n", result);
+    assert(result == 15);
+    return 0;
+}
+
+int test_get_function_code_16()
+{
+    unsigned char frame[2] ={ 247, 16 };
+    unsigned char frame_size = sizeof(frame);
+    unsigned char result = get_function_code(frame, frame_size);
+    printf("WRITE_MULTIPLE_HOLDING_REGISTERS: %d\n", result);
+    assert(result == 16);
+    return 0;
+}
+
 int test_verify_slave_id_matches_true()
 {
     unsigned char frame[1] ={ 247 };
     unsigned char frame_size = sizeof(frame);
     bool result = verify_slave_id_matches(frame, frame_size, 247);
-    printf("Slave ID Matches 247: %d\n", result);
+    printf("Slave ID Matches 247: %s\n", result ? "true" : "false");
     assert(result);
     return 0;
 }
@@ -158,9 +218,165 @@ int test_verify_slave_id_matches_false()
     unsigned char frame[1] ={ 1 };
     unsigned char frame_size = sizeof(frame);
     bool result = verify_slave_id_matches(frame, frame_size, 247);
-    printf("Slave ID Matches 247: %d\n", result);
+    printf("Slave ID Matches 247: %s\n", result ? "true" : "false");
     assert(!result);
     return 0;
+}
+
+int test_is_broadcast_message_true()
+{
+    unsigned char frame[1] ={ 0 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = is_broadcast_message(frame, frame_size);
+    printf("Broadcast Message: %s\n", result ? "true" : "false");
+    assert(result);
+    return 0;
+}
+
+int test_is_broadcast_message_false()
+{
+    unsigned char frame[1] ={ 1 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = is_broadcast_message(frame, frame_size);
+    printf("Broadcast Message: %s\n", result ? "true" : "false");
+    assert(!result);
+    return 0;
+}
+
+int test_verify_broadcast_and_function_code_broadcast_and_read_coils()
+{
+    unsigned char frame[2] ={ 0, 1 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_broadcast_and_function_code(frame, frame_size);
+    printf("Broadcast and READ_COILS: %s\n", result ? "true" : "false");
+    assert(!result);
+    return 0;
+}
+
+int test_verify_broadcast_and_function_code_broadcast_and_read_holding_registers()
+{
+    unsigned char frame[2] ={ 0, 3 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_broadcast_and_function_code(frame, frame_size);
+    printf("Broadcast and READ_HOLDING_REGISTERS: %s\n", result ? "true" : "false");
+    assert(!result);
+    return 0;
+}
+
+int test_verify_broadcast_and_function_code_broadcast_and_write_coil()
+{
+    unsigned char frame[2] ={ 0, 5 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_broadcast_and_function_code(frame, frame_size);
+    printf("Broadcast and WRITE_SINGLE_COIL: %s\n", result ? "true" : "false");
+    assert(result);
+    return 0;
+}
+
+int test_verify_broadcast_and_function_code_broadcast_and_write_holding_register()
+{
+    unsigned char frame[2] ={ 0, 6 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_broadcast_and_function_code(frame, frame_size);
+    printf("Broadcast WRITE_SINGLE_HOLDING_REGISTER: %s\n", result ? "true" : "false");
+    assert(result);
+    return 0;
+}
+
+int test_verify_broadcast_and_function_code_broadcast_and_write_coils()
+{
+    unsigned char frame[2] ={ 0, 15 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_broadcast_and_function_code(frame, frame_size);
+    printf("Broadcast WRITE_MUTLTIPLE_COILS: %s\n", result ? "true" : "false");
+    assert(result);
+    return 0;
+}
+
+int test_verify_broadcast_and_function_code_broadcast_and_write_holding_registers()
+{
+    unsigned char frame[2] ={ 0, 16 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_broadcast_and_function_code(frame, frame_size);
+    printf("Broadcast WRITE_MULTIPLE_HOLDING_REGISTERS: %s\n", result ? "true" : "false");
+    assert(result);
+    return 0;
+}
+
+int test_verify_broadcast_and_function_code_not_broadcast()
+{
+    unsigned char frame[2] ={ 2, 3 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_broadcast_and_function_code(frame, frame_size);
+    printf("Not Broadcast: %s\n", result ? "true" : "false");
+    assert(result);
+    return 0;
+}
+
+int test_destined_for_me_broadcast()
+{
+    unsigned char frame[1] ={ 0 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = destined_for_me(frame, frame_size, 2);
+    printf("Destined for me (Broadcast): %s\n", result ? "true" : "false");
+    assert(result);
+    return 0;
+}
+
+int test_destined_for_me_id_match()
+{
+    unsigned char frame[1] ={ 2 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = destined_for_me(frame, frame_size, 2);
+    printf("Destined for me (ID match of 2): %s\n", result ? "true" : "false");
+    assert(result);
+    return 0;
+}
+
+int test_destined_for_me_id_mismatch()
+{
+    unsigned char frame[1] ={ 1 };
+    unsigned char frame_size = sizeof(frame);
+    bool result = destined_for_me(frame, frame_size, 2);
+    printf("Destined for me (ID mismatch 1 != 2): %s\n", result ? "true" : "false");
+    assert(!result);
+    return 0;
+}
+
+int test_calc_crc_read_coils()
+{
+    unsigned char frame[6] ={ 1, 1, 0, 0, 0, 1 };
+    unsigned char frame_size = sizeof(frame);
+    unsigned int crc = calculate_crc(frame, frame_size);
+    printf("Coils CRC: 0x%x\n", crc);
+    assert(crc == 0xfdca);
+}
+
+int test_calc_crc_read_holding_registers()
+{
+    unsigned char frame[6] ={ 1, 3, 0, 0, 0, 1 };
+    unsigned char frame_size = sizeof(frame);
+    unsigned int crc = calculate_crc(frame, frame_size);
+    printf("Holding Register CRC: 0x%x\n", crc);
+    assert(crc == 0x840a);
+}
+
+int test_verify_crc_read_coils()
+{
+    unsigned char frame[8] ={ 1, 1, 0, 0, 0, 1, 0xfd, 0xca };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_crc(frame, frame_size);
+    printf("Coils CRC verified: %s\n", result ? "true" : "false");
+    assert(result);
+}
+
+int test_verify_crc_read_holding_registers()
+{
+    unsigned char frame[8] ={ 1, 3, 0, 0, 0, 1, 0x84, 0x0a };
+    unsigned char frame_size = sizeof(frame);
+    bool result = verify_crc(frame, frame_size);
+    printf("Holding Register CRC verified: %s\n", result ? "true" : "false");
+    assert(result);
 }
 
 int test_verify_frame_size()
@@ -187,10 +403,58 @@ int test_get_slave_id()
     return 0;
 }
 
+int test_get_function_code()
+{
+    printf("Testing get_function_code()\n");
+    test_get_function_code_1();
+    test_get_function_code_3();
+    test_get_function_code_5();
+    test_get_function_code_6();
+    test_get_function_code_15();
+    test_get_function_code_16();
+}
+
+int test_verify_broadcast_and_function_code()
+{
+    test_verify_broadcast_and_function_code_not_broadcast();
+    test_verify_broadcast_and_function_code_broadcast_and_read_coils();
+    test_verify_broadcast_and_function_code_broadcast_and_read_holding_registers();
+    test_verify_broadcast_and_function_code_broadcast_and_write_coil();
+    test_verify_broadcast_and_function_code_broadcast_and_write_coils();
+    test_verify_broadcast_and_function_code_broadcast_and_write_holding_register();
+    test_verify_broadcast_and_function_code_broadcast_and_write_holding_registers();
+    return 0;
+}
+
 int test_verify_slave_id_matches()
 {
     test_verify_slave_id_matches_true();
     test_verify_slave_id_matches_false();
+}
+
+int test_is_broadcast_message()
+{
+    test_is_broadcast_message_true();
+    test_is_broadcast_message_false();
+}
+
+int test_destined_for_me()
+{
+    test_destined_for_me_broadcast();
+    test_destined_for_me_id_match();
+    test_destined_for_me_id_mismatch();
+}
+
+int test_calc_crc()
+{
+    test_calc_crc_read_coils();
+    test_calc_crc_read_holding_registers();
+}
+
+int test_verify_crc()
+{
+    test_verify_crc_read_coils();
+    test_verify_crc_read_holding_registers();
 }
 
 int main(int argc, char *argv[])
@@ -199,6 +463,12 @@ int main(int argc, char *argv[])
     test_verify_frame_size();
     test_get_slave_id();
     test_verify_slave_id_matches();
+    test_is_broadcast_message();
+    test_get_function_code();
+    test_verify_broadcast_and_function_code();
+    test_destined_for_me();
+    test_calc_crc();
+    test_verify_crc();
 
     return 0;
 }

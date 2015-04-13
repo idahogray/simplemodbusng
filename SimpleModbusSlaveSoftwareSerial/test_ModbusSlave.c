@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include "SimpleModbusSlaveSoftwareSerial.h"
+#include "HoldingRegisters.h"
+#include "ModbusCRC.h"
 
 
 int test_verify_frame_size_1()
@@ -457,6 +459,11 @@ int test_verify_crc()
     test_verify_crc_read_holding_registers();
 }
 
+int test_read_holding_registers()
+{
+    ;
+}
+
 int main(int argc, char *argv[])
 {
     printf("Running test_ModbusSlave.exe\n");
@@ -469,6 +476,7 @@ int main(int argc, char *argv[])
     test_destined_for_me();
     test_calc_crc();
     test_verify_crc();
+    test_read_holding_registers();
 
     return 0;
 }

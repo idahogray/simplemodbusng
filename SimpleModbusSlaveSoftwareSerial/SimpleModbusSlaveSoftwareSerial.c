@@ -23,15 +23,8 @@ unsigned int holdingRegsSize; // size of the register array
 unsigned int coilsSize; // size of the register array 
 unsigned char slaveID;
 unsigned char TxEnablePin;
-unsigned int errorCount;
 unsigned int T1_5; // inter character time out
 unsigned int T3_5; // frame delay
-
-struct modbus_response modbus_update()
-{
-    struct modbus_response response = { 0, { 0 } };
-    return response;
-}
 
 unsigned char get_function_code(unsigned char *frame, unsigned char frame_size)
 {
@@ -179,18 +172,4 @@ bool destined_for_me(unsigned char *frame, unsigned char frame_size, unsigned ch
   }
 }*/
 
-
-/*void exceptionResponse(unsigned char exception, unsigned char *frame, unsigned char frame_size)
-{
-  errorCount++; // each call to exceptionResponse() will increment the errorCount
-  if (!is_broadcast_message(frame, frame_size)) // don't respond if its a broadcast message
-  {
-    frame[0] = slaveID;
-    //frame[1] = (function_code | 0x80); // set the MSB bit high, informs the master of an exception
-    frame[2] = exception;
-    unsigned int crc16 = calculateCRC(3); // ID, function_code + 0x80, exception code == 3 bytes
-    frame[3] = crc16 >> 8;
-    frame[4] = crc16 & 0xFF;
-  }
-}*/
 

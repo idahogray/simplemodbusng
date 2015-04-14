@@ -1,9 +1,23 @@
 #include <assert.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include "SimpleModbusSlaveSoftwareSerial.h"
 #include "HoldingRegisters.h"
 #include "ModbusCRC.h"
+#include "ModbusException.h"
 
+
+int test_verify_frame_size();
+int test_get_slave_id();
+int test_verify_slave_id_matches();
+int test_is_broadcast_message();
+int test_get_function_code();
+int test_verify_broadcast_and_function_code();
+int test_destined_for_me();
+int test_calc_crc();
+int test_verify_crc();
+int test_exception_response();
+int test_read_holding_registers();
 
 int test_verify_frame_size_1()
 {
@@ -352,6 +366,7 @@ int test_calc_crc_read_coils()
     unsigned int crc = calculate_crc(frame, frame_size);
     printf("Coils CRC: 0x%x\n", crc);
     assert(crc == 0xfdca);
+    return 0;
 }
 
 int test_calc_crc_read_holding_registers()
@@ -361,6 +376,7 @@ int test_calc_crc_read_holding_registers()
     unsigned int crc = calculate_crc(frame, frame_size);
     printf("Holding Register CRC: 0x%x\n", crc);
     assert(crc == 0x840a);
+    return 0;
 }
 
 int test_verify_crc_read_coils()
@@ -370,6 +386,7 @@ int test_verify_crc_read_coils()
     bool result = verify_crc(frame, frame_size);
     printf("Coils CRC verified: %s\n", result ? "true" : "false");
     assert(result);
+    return 0;
 }
 
 int test_verify_crc_read_holding_registers()
@@ -379,6 +396,60 @@ int test_verify_crc_read_holding_registers()
     bool result = verify_crc(frame, frame_size);
     printf("Holding Register CRC verified: %s\n", result ? "true" : "false");
     assert(result);
+    return 0;
+}
+
+int test_exception_response_2()
+{
+    unsigned char *response;
+    response = illegal_data_address_exception(1, 3);  
+    printf("Illegal Data Address Response: 0x%x, 0x%x, 0x%x\n", response[0], response[1], response[2]);
+    assert(response[0] == 1 && response[1] == 0x83 && response[2] == 2);
+    free(response);
+    return 0;
+}
+
+int test_read_holding_register_starting_address_larger_than_number_of_holding_registers()
+{
+    unsigned int holding_registers[2] = { 23, 65535 };
+    unsigned char holding_registers_count = sizeof(holding_registers) / sizeof(int);
+    unsigned char *response;
+    response = read_holding_registers(1, 3, 1, holding_registers, holding_registers_count);
+    printf("Starting address outside of the holding register address range: 0x%x, 0x%x, 0x%x\n", response[0], response[1], response[2]);
+    assert(response[0] == 1 && response[1] == 0x83 && response[2] == 2);
+    free(response);
+    return 0;
+}
+
+
+int test_read_holding_register_too_many_registers_requested()
+{
+    unsigned int holding_registers[2] = { 23, 65535 };
+    unsigned char holding_registers_count = sizeof(holding_registers) / sizeof(int);
+    unsigned char *response;
+    response = read_holding_registers(1, 0, 3, holding_registers, holding_registers_count);
+    printf("Too Many Holding Registers Requested Response: 0x%x, 0x%x, 0x%x\n", response[0], response[1], response[2]);
+    assert(response[0] == 1 && response[1] == 0x83 && response[2] == 2);
+    free(response);
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    printf("Running test_ModbusSlave.exe\n");
+    test_verify_frame_size();
+    test_get_slave_id();
+    test_verify_slave_id_matches();
+    test_is_broadcast_message();
+    test_get_function_code();
+    test_verify_broadcast_and_function_code();
+    test_destined_for_me();
+    test_calc_crc();
+    test_verify_crc();
+    test_exception_response();
+    test_read_holding_registers();
+
+    return 0;
 }
 
 int test_verify_frame_size()
@@ -414,6 +485,7 @@ int test_get_function_code()
     test_get_function_code_6();
     test_get_function_code_15();
     test_get_function_code_16();
+    return 0;
 }
 
 int test_verify_broadcast_and_function_code()
@@ -432,12 +504,14 @@ int test_verify_slave_id_matches()
 {
     test_verify_slave_id_matches_true();
     test_verify_slave_id_matches_false();
+    return 0;
 }
 
 int test_is_broadcast_message()
 {
     test_is_broadcast_message_true();
     test_is_broadcast_message_false();
+    return 0;
 }
 
 int test_destined_for_me()
@@ -445,38 +519,32 @@ int test_destined_for_me()
     test_destined_for_me_broadcast();
     test_destined_for_me_id_match();
     test_destined_for_me_id_mismatch();
+    return 0;
 }
 
 int test_calc_crc()
 {
     test_calc_crc_read_coils();
     test_calc_crc_read_holding_registers();
+    return 0;
 }
 
 int test_verify_crc()
 {
     test_verify_crc_read_coils();
     test_verify_crc_read_holding_registers();
+    return 0;
 }
 
 int test_read_holding_registers()
 {
-    ;
+    test_read_holding_register_starting_address_larger_than_number_of_holding_registers();
+    test_read_holding_register_too_many_registers_requested();
+    return 0;
 }
 
-int main(int argc, char *argv[])
+int test_exception_response()
 {
-    printf("Running test_ModbusSlave.exe\n");
-    test_verify_frame_size();
-    test_get_slave_id();
-    test_verify_slave_id_matches();
-    test_is_broadcast_message();
-    test_get_function_code();
-    test_verify_broadcast_and_function_code();
-    test_destined_for_me();
-    test_calc_crc();
-    test_verify_crc();
-    test_read_holding_registers();
-
+    test_exception_response_2();
     return 0;
 }

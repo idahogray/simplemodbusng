@@ -15,3 +15,5 @@ NEW: Support for SoftwareSerial, really useful on AtTiny85. You can find both li
 
 ## Usage
 Simply copy the SimpleModbusMaster or SimpleModbusSlave or both into your Arduino IDE **libraries** folder. Than restart the ide and open the corresponding example into the example_master or example_slave folder.
+
+Make sure you free the memory pointed to by the response of read_holding_registers().

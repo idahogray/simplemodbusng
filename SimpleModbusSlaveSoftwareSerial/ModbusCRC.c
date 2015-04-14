@@ -1,5 +1,7 @@
 #include "ModbusCRC.h"
 
+#include "ModbusCRC.h"
+
 unsigned int calculate_crc(unsigned char *frame, unsigned char frame_size) 
 {
   unsigned int temp, temp2, flag;

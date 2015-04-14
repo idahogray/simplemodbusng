@@ -86,20 +86,13 @@
 
 typedef unsigned char byte;
 
-struct modbus_response {
-    unsigned int error_count;
-    unsigned char frame[BUFFER_SIZE];
-};
-
-
+extern const unsigned char READ_HOLDING_REGISTERS;
 
 // function definitions
 unsigned char get_slave_id(unsigned char *frame, unsigned char frame_size);
 unsigned char get_function_code(unsigned char *frame, unsigned char frame_size);
 bool verify_slave_id_matches(unsigned char *frame, unsigned char buffer_size, unsigned char slave_id);
 bool is_broadcast_message(unsigned char *frame, unsigned char buffer_size);
-unsigned int calculate_crc(unsigned char *frame, unsigned char frame_size);
-bool verify_crc(unsigned char *frame, unsigned char frame_size);
 bool verify_frame_size(unsigned char *frame, unsigned char frame_size);
 bool verify_broadcast_and_function_code(unsigned char *frame, unsigned char frame_size);
 bool destined_for_me(unsigned char *frame, unsigned char frame_size, unsigned char my_slave_id);

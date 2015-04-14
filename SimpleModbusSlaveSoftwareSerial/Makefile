@@ -1,19 +1,21 @@
-CFLAGS=-Wall -g
+CC=gcc
+CFLAGS=-Wall -g -std=c99
+
+objects = SimpleModbusSlaveSoftwareSerial.o HoldingRegisters.o ModbusCRC.o ModbusException.o test_ModbusSlave.o
 
 all: run
 
 run:
 	./test_ModbusSlave.exe
 
-test:
-	gcc -std=c99 -c SimpleModbusSlaveSoftwareSerial.c -o SimpleModbusSlaveSoftwareSerial.o
-	ar rcs libSimpleModbusSlaveSoftwareSerial.a SimpleModbusSlaveSoftwareSerial.o
-	gcc -std=c99 -c HoldingRegisters.c -o HoldingRegisters.o
-	ar rcs libHoldingRegisters.a HoldingRegisters.o
-	gcc -std=c99 -c ModbusCRC.c -o ModbusCRC.o
-	ar rcs libModbusCRC.a ModbusCRC.o
-	gcc -c test_ModbusSlave.c -o test_ModbusSlave.o
-	gcc -o test_ModbusSlave.exe test_ModbusSlave.o -L. -lSimpleModbusSlaveSoftwareSerial -lHoldingRegisters -lModbusCRC
+test : $(objects)
+	gcc -o test_ModbusSlave.exe $(objects)
 
+test_ModbusSlave.exe : test_ModbusSlave.h SimpleModbusSlaveSoftwareSerial.h HoldingRegisters.h ModbusCRC.h 
+SimpleModbusSlaveSoftwareSerial.o : SimpleModbusSlaveSoftwareSerial.h HoldingRegisters.h ModbusCRC.h
+ModbusCRC.o : ModbusCRC.h
+ModbusException.o : ModbusException.h ModbusCRC.h
+
+.PHONY : clean
 clean:
-	rm -f test_ModbusSlave.exe
+	rm -f $(objects)
